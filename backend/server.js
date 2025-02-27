@@ -12,7 +12,7 @@ const port = 5000;
 
 // **MongoDB Connection**
 mongoose
-  .connect("mongodb://localhost:27017/attendance-system", {
+  .connect("mongodb+srv://aryavjain170804:Aryav123@cluster0.iz6by.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
@@ -38,10 +38,11 @@ const UserSchema = new mongoose.Schema({
 });
 
 const AttendanceSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Reference to User
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   class: { type: String, default: "" },
   subject: { type: String, default: "" },
   year: { type: String, default: "" },
+  sheetNumber: { type: String, default: "" }, // Add sheet number field
   data: { type: Array, required: true },
 });
 const User = mongoose.model("User", UserSchema);
@@ -104,7 +105,7 @@ app.patch("/api/update-user-details", authenticateToken, async (req, res) => {
 // **PATCH Update Specific Attendance Record (Protected)**
 app.patch("/api/update-attendance", authenticateToken, async (req, res) => {
   try {
-    const { class: newClass, subject, year, updatedData } = req.body;
+    const { class: newClass, subject, year, sheetNumber, updatedData } = req.body;
 
     if (!updatedData) {
       return res.status(400).json({ error: "Missing updatedData" });
@@ -115,10 +116,11 @@ app.patch("/api/update-attendance", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "No attendance data found" });
     }
 
-    // Update class, subject, year, and attendance data
+    // Update class, subject, year, sheet number, and attendance data
     attendance.class = newClass || attendance.class;
     attendance.subject = subject || attendance.subject;
     attendance.year = year || attendance.year;
+    attendance.sheetNumber = sheetNumber || attendance.sheetNumber;
     attendance.data = updatedData;
     await attendance.save();
 
@@ -207,7 +209,7 @@ app.get("/api/attendance-data", authenticateToken, async (req, res) => {
 // **POST Attendance Data (Protected)**
 app.post("/api/attendance-data", authenticateToken, async (req, res) => {
   try {
-    const { class: newClass, subject, year, data } = req.body;
+    const { class: newClass, subject, year, sheetNumber, data } = req.body;
 
     if (!Array.isArray(data)) {
       return res.status(400).json({
@@ -218,7 +220,7 @@ app.post("/api/attendance-data", authenticateToken, async (req, res) => {
     // Update or create attendance data for user
     await Attendance.findOneAndUpdate(
       { userId: req.user.userId },
-      { class: newClass, subject, year, data }, // Save class, subject, and year
+      { class: newClass, subject, year, sheetNumber, data }, // Include sheet number
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
@@ -233,7 +235,64 @@ app.post("/api/attendance-data", authenticateToken, async (req, res) => {
     });
   }
 });
+// Add this new endpoint to get all sheet numbers associated with a user
+app.get("/api/user-sheets", authenticateToken, async (req, res) => {
+  try {
+    // Find all attendance records for the user
+    const attendanceRecords = await Attendance.find({ userId: req.user.userId });
+    
+    if (!attendanceRecords || attendanceRecords.length === 0) {
+      return res.json({ sheets: [] });
+    }
+    
+    // Extract unique sheet information
+    const sheets = attendanceRecords.map(record => ({
+      id: record._id,
+      sheetNumber: record.sheetNumber || "Untitled Sheet",
+      class: record.class || "",
+      subject: record.subject || "",
+      year: record.year || "",
+      lastUpdated: record._id.getTimestamp()
+    }));
+    
+    res.json({ sheets });
+  } catch (error) {
+    res.status(500).json({ 
+      error: "Failed to fetch user's sheet numbers", 
+      details: error.message 
+    });
+  }
+});
 
+// Add this endpoint to get a specific attendance sheet
+app.get("/api/attendance-data/:sheetId", authenticateToken, async (req, res) => {
+  try {
+    const { sheetId } = req.params;
+    
+    // Verify that the sheet belongs to the user
+    const attendance = await Attendance.findOne({ 
+      _id: sheetId,
+      userId: req.user.userId 
+    }).populate("userId", "username");
+    
+    if (!attendance) {
+      return res.status(404).json({ error: "Attendance sheet not found" });
+    }
+    
+    // Include username in the response
+    const responseData = {
+      ...attendance.toObject(),
+      username: attendance.userId.username,
+    };
+    
+    res.json(responseData);
+  } catch (error) {
+    res.status(500).json({ 
+      error: "Failed to fetch attendance data", 
+      details: error.message 
+    });
+  }
+});
 // **File Upload Setup (Multer)**
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
