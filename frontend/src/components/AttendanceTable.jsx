@@ -1,6 +1,5 @@
 
 
-
 import React, { useState, useEffect } from "react";
 import ImageUpload from "./ImageUpload";
 
@@ -16,21 +15,29 @@ const AttendanceTable = ({ token, sheetId }) => {
   const [isEditing, setIsEditing] = useState(false); // State for editing mode
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const columnMapping = {
+    "0": "Batch",
+    "1": "Roll No.",
+    "2": "Name Of Student",
+    "3": "Lec1",
+    "4": "Lec2",
+    "5": "Lec3",
+    "6": "Lec4",
+    "7": "Lec5",
+  };
   // Fetch Data from Backend
   useEffect(() => {
-    if (!token) return; // Ensure token exists before making API call
-
+    if (!token) return;
+  
     const fetchAttendanceData = async () => {
       try {
         setLoading(true);
         let url = "http://localhost:5000/api/attendance-data";
-        
-        // If sheetId is provided and not 'new', fetch that specific sheet
-        if (sheetId && sheetId !== 'new') {
+  
+        if (sheetId && sheetId !== "new") {
           url = `http://localhost:5000/api/attendance-data/${sheetId}`;
         }
-
+  
         const response = await fetch(url, {
           method: "GET",
           headers: {
@@ -38,60 +45,28 @@ const AttendanceTable = ({ token, sheetId }) => {
             "Content-Type": "application/json",
           },
         });
-
+  
         if (!response.ok) {
           throw new Error("Failed to fetch attendance data");
         }
-
+  
         const data = await response.json();
-
-        // If it's a new sheet, initialize with empty data
-        if (sheetId === 'new') {
-          // Initialize with a basic empty structure
-          setUsername(data.username || "");
-          setClassValue("");
-          setSubject("");
-          setYear("");
-          setSheetNumber("");
-          
-          // Create empty table structure
-          const emptyData = [
-            { "S.No": "S.No", "Name Of Student": "Name Of Student", "Roll No": "Roll No", "Lec1": "" },
-            { "S.No": "", "Name Of Student": "Date>", "Roll No": "", "Lec1": "" },
-            { "S.No": "", "Name Of Student": "Time>", "Roll No": "", "Lec1": "" }
-          ];
-          setTableData(emptyData);
-          setUpdatedData(emptyData);
-          setColumns(["S.No", "Name Of Student", "Roll No", "Lec1"]);
-        } else {
-          // Set username, class, subject, year, and sheet number
-          if (data.username) setUsername(data.username);
-          if (data.class) setClassValue(data.class);
-          if (data.subject) setSubject(data.subject);
-          if (data.year) setYear(data.year);
-          if (data.sheetNumber) setSheetNumber(data.sheetNumber);
-
-          // Set table data and columns
-          if (data.data && data.data.length > 0) {
-            const colKeys = Object.keys(data.data[0])
-              .filter((col) => col !== "Date>" && col !== "Time>" && col !== "Name Of Student");
-
-            setColumns(colKeys);
-            setTableData(data.data);
-            setUpdatedData(data.data); // Initialize updatedData with fetched data
-          } else {
-            // Default empty structure if no data
-            const emptyData = [
-              { "S.No": "S.No", "Name Of Student": "Name Of Student", "Roll No": "Roll No", "Lec1": "" },
-              { "S.No": "", "Name Of Student": "Date>", "Roll No": "", "Lec1": "" },
-              { "S.No": "", "Name Of Student": "Time>", "Roll No": "", "Lec1": "" }
-            ];
-            setTableData(emptyData);
-            setUpdatedData(emptyData);
-            setColumns(["S.No", "Name Of Student", "Roll No", "Lec1"]);
-          }
-        }
-        
+  
+        // Transform data using columnMapping
+        const transformedData = data.data.map((row) => {
+          const newRow = {};
+          Object.keys(row).forEach((key) => {
+            const columnName = columnMapping[key] || key; // Use columnMapping or fallback to the original key
+            newRow[columnName] = row[key];
+          });
+          return newRow;
+        });
+  
+        // Set transformed data and columns
+        setTableData(transformedData);
+        setUpdatedData(transformedData);
+        setColumns(Object.values(columnMapping)); // Use the mapped column names
+  
         setLoading(false);
       } catch (error) {
         console.error("Error fetching attendance data:", error);
@@ -99,10 +74,9 @@ const AttendanceTable = ({ token, sheetId }) => {
         setLoading(false);
       }
     };
-
+  
     fetchAttendanceData();
-  }, [token, sheetId]); // Run whenever token or sheetId changes
-
+  }, [token, sheetId]);
   // Toggle Attendance (Present/Absent)
   const toggleAttendance = (rowIndex, colKey) => {
     setUpdatedData((prevData) => {
@@ -312,69 +286,33 @@ const AttendanceTable = ({ token, sheetId }) => {
               </tr>
             </thead>
             <tbody>
-              {updatedData.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {columns.map((col, colIndex) => (
-                    <td
-                      key={colIndex}
-                      className={`border border-gray-300 p-2 text-center cursor-pointer ${
-                        colIndex >= 2 && rowIndex > 2
-                          ? row[col] === 1
-                            ? "bg-red-200 text-red-700"
-                            : row[col] === 2
-                            ? "bg-green-200 text-green-700"
-                            : "bg-gray-200 text-gray-700"
-                          : ""
-                      }`}
-                      onClick={() => (colIndex >= 2 && rowIndex > 2 ? toggleAttendance(rowIndex, col) : null)}
-                    >
-                      {rowIndex === 1 && colIndex >= 2 ? (
-                        <input
-                          type="date"
-                          value={row[`${col}_date`] || ""}
-                          onChange={(e) =>
-                            handleDateTimeChange(rowIndex, col, "date", e.target.value)
-                          }
-                          className="p-2 mr-4 border border-gray-300 rounded"
-                        />
-                      ) : rowIndex === 2 && colIndex >= 2 ? (
-                        <div>
-                          From:
-                          <input
-                            type="time"
-                            value={row[`${col}_fromTime`] || ""}
-                            onChange={(e) =>
-                              handleDateTimeChange(rowIndex, col, "fromTime", e.target.value)
-                            }
-                            className="p-2 mr-4 border border-gray-300 rounded"
-                          />
-                          <br />
-                          To:
-                          <input
-                            type="time"
-                            value={row[`${col}_toTime`] || ""}
-                            onChange={(e) =>
-                              handleDateTimeChange(rowIndex, col, "toTime", e.target.value)
-                            }
-                            className="p-2 mr-4 border border-gray-300 rounded"
-                          />
-                        </div>
-                      ) : rowIndex >= 3 && colIndex >= 2 ? (
-                        row[col] === 1 ? (
-                          "Absent"
-                        ) : row[col] === 2 ? (
-                          "Present"
-                        ) : (
-                          "Undefined"
-                        )
-                      ) : (
-                        row[col]
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
+  {updatedData.map((row, rowIndex) => (
+    <tr key={rowIndex}>
+      {columns.map((col, colIndex) => (
+        <td
+          key={colIndex}
+          className={`border border-gray-300 p-2 text-center ${
+            colIndex >= 2 && rowIndex > 2 && col !== "Name Of Student" // Exclude "Name Of Student"
+              ? row[col] === 1
+                ? "bg-red-200 text-red-700 cursor-pointer"
+                : row[col] === 2
+                ? "bg-green-200 text-green-700 cursor-pointer"
+                : "bg-gray-200 text-gray-700 cursor-pointer"
+              : ""
+          }`}
+          onClick={() => {
+            // Only allow toggling for non-"Name Of Student" columns
+            if (colIndex >= 2 && rowIndex > 2 && col !== "Name Of Student") {
+              toggleAttendance(rowIndex, col);
+            }
+          }}
+        >
+          {row[col]}
+        </td>
+      ))}
+    </tr>
+  ))}
+</tbody>
           </table>
         </div>
       </div>
