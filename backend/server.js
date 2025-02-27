@@ -32,14 +32,17 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // Serve u
 const UserSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   password: { type: String, required: true },
+  class: { type: String, default: "" }, // New field
+  subject: { type: String, default: "" }, // New field
+  year: { type: String, default: "" }, // New field
 });
 
 const AttendanceSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  class: { type: String, default: "", required:true },
-  subject: { type: String, default: "", required:true },
-  year: { type: String, default: "" ,required:true},
-  sheetNumber: { type: String, default: "",required:true }, // Add sheet number field
+  class: { type: String, default: "" },
+  subject: { type: String, default: "" },
+  year: { type: String, default: "" },
+  sheetNumber: { type: String, default: "" }, // Add sheet number field
   data: { type: Array, required: true },
 });
 const User = mongoose.model("User", UserSchema);
