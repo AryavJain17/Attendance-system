@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from "react";
 import ImageUpload from "./ImageUpload";
 
@@ -89,22 +90,12 @@ const AttendanceTable = ({ token, sheetId }) => {
   };
 
   // Handle Date and Time Input Changes
-  const handleDateTimeChange = (rowIndex, colKey, field, value) => {
-    setUpdatedData((prevData) => {
-      const newData = prevData.map((row, index) =>
-        index === rowIndex
-          ? { ...row, [`${colKey}_${field}`]: value } // Store date/time in a unique key
-          : row
-      );
-      return newData;
-    });
-  };
 
   // Handle Submit Button Click
   const handleSubmit = async () => {
     try {
       const response = await fetch("http://localhost:5000/api/attendance-data", {
-        method: "POST", // Use POST for both new and updated sheets
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -117,11 +108,11 @@ const AttendanceTable = ({ token, sheetId }) => {
           data: updatedData,
         }),
       });
-
+  
       if (!response.ok) {
         throw new Error("Failed to update attendance data");
       }
-
+  
       const result = await response.json();
       console.log("Attendance data updated successfully:", result);
       alert("Attendance data updated successfully!");
@@ -170,7 +161,16 @@ const AttendanceTable = ({ token, sheetId }) => {
       </div>
     );
   }
-
+  const handleDateTimeChange = (rowIndex, colKey, field, value) => {
+    setUpdatedData((prevData) => {
+      const newData = prevData.map((row, index) =>
+        index === rowIndex
+          ? { ...row, [`${colKey}_${field}`]: value } // Save date/time in a unique key
+          : row
+      );
+      return newData;
+    });
+  };
   return (
     <div className="p-4 overflow-x-auto">
       {/* Display Username */}
@@ -291,7 +291,7 @@ const AttendanceTable = ({ token, sheetId }) => {
         <td
           key={colIndex}
           className={`border border-gray-300 p-2 text-center ${
-            colIndex >= 2 && rowIndex > 2 && col !== "Name Of Student" // Exclude "Name Of Student"
+            colIndex >= 2 && rowIndex > 2 && col !== "Name Of Student"
               ? row[col] === 1
                 ? "bg-red-200 text-red-700 cursor-pointer"
                 : row[col] === 2
@@ -300,13 +300,55 @@ const AttendanceTable = ({ token, sheetId }) => {
               : ""
           }`}
           onClick={() => {
-            // Only allow toggling for non-"Name Of Student" columns
             if (colIndex >= 2 && rowIndex > 2 && col !== "Name Of Student") {
               toggleAttendance(rowIndex, col);
             }
           }}
         >
-          {row[col]}
+          {col === "Name Of Student" ? ( // Explicitly handle "Name Of Student"
+            row[col] // Render the student name directly
+          ) : rowIndex === 1 && colIndex >= 2 ? ( // Date row
+            <input
+              type="date"
+              value={row[`${col}_date`] || ""}
+              onChange={(e) =>
+                handleDateTimeChange(rowIndex, col, "date", e.target.value)
+              }
+              className="p-2 border border-gray-300 rounded"
+            />
+          ) : rowIndex === 2 && colIndex >= 2 ? ( // Time row
+            <div>
+              From:
+              <input
+                type="time"
+                value={row[`${col}_fromTime`] || ""}
+                onChange={(e) =>
+                  handleDateTimeChange(rowIndex, col, "fromTime", e.target.value)
+                }
+                className="p-2 border border-gray-300 rounded"
+              />
+              <br />
+              To:
+              <input
+                type="time"
+                value={row[`${col}_toTime`] || ""}
+                onChange={(e) =>
+                  handleDateTimeChange(rowIndex, col, "toTime", e.target.value)
+                }
+                className="p-2 border border-gray-300 rounded"
+              />
+            </div>
+          ) : rowIndex >= 3 && colIndex >= 2 ? ( // Attendance status rows
+            row[col] === 1 ? (
+              "Absent"
+            ) : row[col] === 2 ? (
+              "Present"
+            ) : (
+              "Undefined"
+            )
+          ) : (
+            row[col] // Static columns (Batch, Roll No.)
+          )}
         </td>
       ))}
     </tr>

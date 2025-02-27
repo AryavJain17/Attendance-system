@@ -42,8 +42,8 @@ const AttendanceSchema = new mongoose.Schema({
   class: { type: String, default: "" },
   subject: { type: String, default: "" },
   year: { type: String, default: "" },
-  sheetNumber: { type: String, default: "" }, // Add sheet number field
-  data: { type: Array, required: true },
+  sheetNumber: { type: String, default: "" },
+  data: { type: Array, required: true }, // This will include date and time fields
 });
 const User = mongoose.model("User", UserSchema);
 const Attendance = mongoose.model("Attendance", AttendanceSchema);
