@@ -1,3 +1,5 @@
+
+// **MongoDB Connection**
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
@@ -43,7 +45,8 @@ const AttendanceSchema = new mongoose.Schema({
   subject: { type: String, default: "" },
   year: { type: String, default: "" },
   sheetNumber: { type: String, default: "" },
-  data: { type: Array, required: true }, // This will include date and time fields
+  frontData: { type: Array, default: [] }, // Front data
+  backData: { type: Array, default: [] }, // Back data
 });
 const User = mongoose.model("User", UserSchema);
 const Attendance = mongoose.model("Attendance", AttendanceSchema);
@@ -209,7 +212,7 @@ app.get("/api/attendance-data", authenticateToken, async (req, res) => {
 // **POST Attendance Data (Protected)**
 app.post("/api/attendance-data", authenticateToken, async (req, res) => {
   try {
-    const { class: newClass, subject, year, sheetNumber, data } = req.body;
+    const { class: newClass, subject, year, sheetNumber, data, type } = req.body;
 
     if (!Array.isArray(data)) {
       return res.status(400).json({
@@ -217,10 +220,16 @@ app.post("/api/attendance-data", authenticateToken, async (req, res) => {
       });
     }
 
-    // Update or create attendance data for user
+    const update = { class: newClass, subject, year, sheetNumber };
+    if (type === 'front') {
+      update.frontData = data;
+    } else if (type === 'back') {
+      update.backData = data;
+    }
+
     await Attendance.findOneAndUpdate(
-      { userId: req.user.userId },
-      { class: newClass, subject, year, sheetNumber, data }, // Include sheet number
+      { userId: req.user.userId, sheetNumber },
+      update,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
@@ -269,7 +278,6 @@ app.get("/api/attendance-data/:sheetId", authenticateToken, async (req, res) => 
   try {
     const { sheetId } = req.params;
     
-    // Verify that the sheet belongs to the user
     const attendance = await Attendance.findOne({ 
       _id: sheetId,
       userId: req.user.userId 
@@ -279,7 +287,6 @@ app.get("/api/attendance-data/:sheetId", authenticateToken, async (req, res) => 
       return res.status(404).json({ error: "Attendance sheet not found" });
     }
     
-    // Include username in the response
     const responseData = {
       ...attendance.toObject(),
       username: attendance.userId.username,
